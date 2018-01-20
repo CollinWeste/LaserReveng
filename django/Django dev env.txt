@@ -1,0 +1,22 @@
+﻿Install python 3
+
+Install the virtual environment program:
+sudo apt-get install virtualenv
+
+set up a virtual environment:
+virtualenv fml --python=python3.6
+
+Activate virtual envirment in current terminal:
+source fml/bin/activate
+
+pip install pip --upgrade
+
+pip install Django
+
+pip install djangorestframework
+pip install markdown
+pip install django-filter 
+pip install psycopg2
+then you're good to go
+then when you're done: deactivate
+

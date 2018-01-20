@@ -1,0 +1,400 @@
+<!-- 
+Lazer Reveng
+Copyright 2017
+
+client.html
+-->
+
+<html lang="en">
+<head>
+  <title>Laser Reveng Game Display</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="jquery-3.2.1.min.js"></script>
+  <link rel="stylesheet" href="boostrap.min.css">
+  <script src="boostrap.min.js"></script>
+</head>
+
+<!-- TODO: Move style to dedicated file -->
+<style>
+  
+h1 {
+  text-align: center;
+}
+
+canvas {
+  border: 1px solid black;
+  width: 100%;
+  height: auto;
+}
+  
+</style>
+
+<!-- Consider moving Script to dedicated file -->
+<script>
+    
+// Globals
+var serviceURL = 'http://localhost:8080/update';
+var gameState = null;
+
+function pageload() {
+  window.setInterval(doquery, 200);
+}
+    
+function doquery() {
+  var req = new XMLHttpRequest();
+  req.open('GET', serviceURL);
+
+  req.addEventListener('loadend', function() { 
+    process(req.response); 
+  });
+  
+  req.send();
+}
+
+// TODO: Remove when not stubbing
+var testJSON = 
+{
+  'scores': [
+    {
+      'name': 'Collin',
+      'score': 500,
+      'tags': 10,
+      'hits': 5
+    },
+    {
+      'name': 'Anton',
+      'score': 450,
+      'tags': 8,
+      'hits': 7
+    },
+    {
+      'name': 'RedFishBlueF',
+      'score': 10,
+      'tags': 1,
+      'hits': 36
+    },
+    {
+      'name': 'e',
+      'score': 15,
+      'tags': 2,
+      'hits': 4
+    }
+  ],
+  'events': [
+    {
+      'subject': 'Collin',
+      'object': 'Anton',
+      'action': 'Saved'
+    },
+    {
+      'subject': 'Anton',
+      'object': 'RedFishBlueF',
+      'action': 'Tagged'
+    },
+    {
+      'subject': 'e',
+      'object': 'Anton',
+      'action': 'Renamed'
+    }
+  ],
+  'summary': {
+    'teamScores': [
+      18, 1
+    ],
+    'gameMode': 'Team Tagmatch',
+    'gameTime': '3:23',
+    'timeRemaining': '4:37',
+    'location': 'Cougar Entertainment Center'
+  }
+};  
+  
+function process(r) {
+  
+  // TODO: Remove this
+  r = JSON.stringify(testJSON);
+  
+  console.log('Received message from server...');
+  if (r == '') return; 
+
+  // TODO: Sanitize json
+  gameState = JSON.parse(r);
+  
+  // Handle new gamestate object
+  gameHeader(gameState.summary);
+  scoreboard(gameState.scores);
+  wheelOfDeath(gameState.scores, gameState.events);
+  scoreGraph(gameState.summary.teamScores);
+  gameUpdates(gameState.events);
+}
+
+//
+// Loads the game type, scores into the webpage
+//
+function gameHeader(summary) {
+  if (summary == null || summary == undefined) return;
+  
+  var gt = document.getElementById("gameTime");
+  gt.innerHTML = summary.gameTime + "<br>" + summary.timeRemaining + " remaining";
+  
+  var gm = document.getElementById("gameMode");
+  gm.innerHTML = "<h1>" + summary.gameMode + "</h1>";
+  
+  var gl = document.getElementById("gameLocation");
+  gl.innerHTML = summary.location;
+}
+
+// 
+// Loads the scoreboard with information from
+// the JSON gamestate object
+//
+function scoreboard(players) {
+  if (players == null || players == undefined) return;
+  
+  var board = document.getElementById("scoreBoard");
+  if (board == null) return;
+  
+  // clear the inner html to empty the table
+  board.innerHTML = "";
+  
+  // iterate over 'scores', recording in the table
+  for (let player of players) {
+    board.innerHTML += ("<tr>" +
+      "<td>" + player.name + "</td>" +
+      "<td>" + player.score + "</td>" + 
+      "<td>" + player.tags + "</td>" + 
+      "<td>" + player.hits + "</td>" +
+      "</tr>");
+  }
+}
+
+//<!-- TODO: Move WOD and SCORE to dedicated helper.js -->
+var WoDplayers = new Array();
+var WoDtags = new Array();
+const tagTimeout = 5;
+
+const playerWidth = 4;
+// 22 colors -- support for 22 players
+const playerColors = [
+  '#ff0000',
+  '#ff8000',
+  '#ffff00',
+  '#80ff00',
+  '#00ff00',
+  '#00ff80',
+  '#00ffff',
+  '#0080ff',
+  '#0000ff',
+  '#8000ff',
+  '#ff00ff',
+  '#ff0080',
+  '#ff4000',
+  '#ffbf00',
+  '#bfff00',
+  '#40ff00',
+  '#00ff40',
+  '#00ffbf',
+  '#00bfff',
+  '#0040ff',
+  '#4000ff',
+  '#bf00ff',
+  '#ff00bf'
+]
+
+function wheelOfDeath(players, tags) {
+  if (players == null || players == undefined ||
+     tags == null || tags == undefined) return;
+  
+  var wheel = document.getElementById("wheelOfDeath");
+  if (wheel == null) return;
+  
+  // Reassign players, sorted correctly
+  WoDplayers = players;
+  WoDplayers.sort((x,y) => { 
+    if (x.name < y.name) return -1;
+    if (x.name > y.name) return 1;
+    return 0;
+  });
+  
+  // Add new tags to collection
+  for (let tag of tags) {
+    WoDtags.push( { 'detail': tag, 'time': tagTimeout });
+  }
+  
+  drawWoD(wheel, WoDplayers, WoDtags);
+}
+  
+// TODO: Break into multiple functions
+function drawWoD(wheel, players, tags) {
+  if (wheel == null || players == null || tags == null) return;
+  
+  // While not technically correct, 'ppr' is an ok var name
+  var personPerRadian = (2 * Math.PI) / players.length;
+  
+  // Get necessary contexts
+  var ctx = wheel.getContext("2d");
+  
+  // Calculate rectangle points of interest
+  var radius = Math.min(wheel.width, wheel.height) * 0.45;
+  var centerX = wheel.width / 2;
+  var centerY = wheel.height / 2;
+  
+  // Clear current display
+  ctx.clearRect(0, 0, wheel.width, wheel.height);
+  
+  // Draws the circle
+  ctx.fillStyle = '#CCCCCC';
+  ctx.beginPath();
+  ctx.arc(wheel.width / 2,
+          wheel.height / 2,
+          radius,
+          0,
+          2 * Math.PI);
+  ctx.fill();
+  
+  // Place people
+  var currentAngle = 0;
+  var currentColor = 0;
+  for (let player of players) {
+    var x = radius * Math.cos(currentAngle);
+    var y = radius * Math.sin(currentAngle);
+    
+    ctx.fillStyle = playerColors[currentColor];
+    ctx.beginPath();
+    ctx.arc(centerX + x,
+            centerY - y,
+            playerWidth,
+            0,
+            2 * Math.PI);
+    ctx.fill();
+    
+    currentAngle += personPerRadian;
+    currentColor ++;
+  }
+  
+  // Draw tags
+  ctx.fillStyle = '#000000';
+  
+  var newTags = new Array();
+  for (let tag of tags) {
+    
+    if (tag.time > 0) {
+      
+      var subjectIndex = 
+        players.findIndex(function(x){ return x.name == tag.detail.subject; });
+      var objectIndex = 
+        players.findIndex(function(x){ return x.name == tag.detail.object; });
+      
+      if (subjectIndex >= 0 && objectIndex >= 0) {
+        var subjectPosition = {
+          'x': centerX + radius * Math.cos(subjectIndex * personPerRadian),
+          'y': centerY - radius * Math.sin(subjectIndex * personPerRadian)
+        }
+        var objectPosition = {
+          'x': centerX + radius * Math.cos(objectIndex * personPerRadian),
+          'y': centerY - radius * Math.sin(objectIndex * personPerRadian)
+        }
+        
+        ctx.beginPath();
+        ctx.moveTo(subjectPosition.x, subjectPosition.y);
+        ctx.lineTo(objectPosition.x, objectPosition.y);
+        ctx.stroke();
+        
+        tag.time--;
+        newTags.push(tag);
+      }
+    }
+  }
+  WoDtags = newTags;
+}
+  
+function scoreGraph(scores) {
+  if (scores == null) return;
+  
+  var graph = document.getElementById("gameScoreGraph");
+  if (graph == null) return;
+  
+  var widthPerPoint = graph.width / scores.length;
+  var minScore = 0;
+  var maxScore = 0;
+  
+  // TODO: Draw
+}
+  
+var gameEvents = new Array();
+const maxEvents = 8;
+  
+function gameUpdates(events) {
+  if (events == null || events == undefined) return;
+  
+  var updates = document.getElementById("updates");
+  if (updates == null) return;
+  
+  // add new messages
+  for (let e of events) {
+    gameEvents.unshift(e.subject + ' ' + e.action + ' ' + e.object + '.');
+  }
+  
+  // remove older messages
+  while (gameEvents.length > maxEvents) {
+    gameEvents.pop();
+  }
+  
+  // finally update the update table data
+  updates.innerHTML = '';
+  
+  for (let e of gameEvents) {
+    updates.innerHTML += '<tr><td>' + e + '</td></tr>';
+  }
+}
+    
+</script>
+
+<body onload="pageload()">
+  <div class="container">
+    <div class="row" id="gameHeader">
+      <div class="col-sm-3" id="gameTime"></div>
+      <div class="col-sm-6" id="gameMode"></div>
+      <div class="col-sm-3" id="gameLocation"></div>
+    </div>
+    <div class="row">
+      <div class="col-sm-5">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Score</th>
+              <th>Tags</th>
+              <th>Hits</th>
+            </tr>
+          </thead>
+          <tbody id="scoreBoard">
+            <!-- Fill dynamically w/ datasource -->
+          </tbody>
+        </table>
+      </div>
+      <div class="col-sm-4">
+        <div id="gameScore" class="well"><h2>Team Score</h2></div>
+        <div id="gameScoreGraph" class="well">
+          <h4>(score graph)</h4>
+          <canvas id="scoreGraph"></canvas>
+          <h4>(wheel of mf tags)</h4>
+          <canvas id="wheelOfDeath"></canvas>
+        </div>
+      </div>
+      <div class="col-sm-3">
+        <div id="gameEvents">
+          <table class="table">
+            <thead>
+              <tr><th>Updates</th></tr>
+            </thead>
+            <tbody id="updates">
+              <!-- Fill dynamically w/ datasource -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

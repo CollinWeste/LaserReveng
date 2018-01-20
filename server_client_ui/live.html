@@ -1,0 +1,103 @@
+<!-- 
+Lazer Reveng
+Copyright 2017
+
+live.html
+-->
+
+<html lang="en">
+<head>
+  <title>Laser Reveng Live Display</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+</head>
+  
+<style>
+
+canvas {
+  border: 1px solid black;
+  width: 100%;
+  height: auto;
+}
+  
+</style>
+
+<script>
+    
+// Globals
+var serviceURL = 'http://localhost:8080/live';  
+
+function pageload() {
+    
+  window.setInterval(doquery, 200);
+}
+    
+function doquery() {
+  var req = new XMLHttpRequest();
+  req.open('GET', serviceURL);
+
+  req.addEventListener('loadend', function() { 
+    process(req.response); 
+  });
+  
+  req.send();
+}
+    
+function process(r) {
+  console.log('Received message from server...');
+  if (r == '') return; 
+
+  // handle response
+}
+    
+</script>
+
+<body onload="pageload()">
+  <div class="container">
+    <div class="row">
+      <div class="col-sm-9">
+        <div class="row">
+          <div class="col-sm-3">(Game Time) 3:43 remaining</div>
+          <div class="col-sm-6"><h1>(Game Type) Team Tagmatch</h1></div>
+          <div class="col-sm-3">(Game Location) Cougar Entertainment Center</div>
+        </div>
+        <canvas></canvas>
+      </div>
+      <div class="col-sm-3">
+        <div id="gameEvents">
+          <table class="table">
+            <thead>
+              <tr><th>Updates</th></tr>
+            </thead>
+            <tbody id="updates">
+              <!-- Fill dynamically w/ datasource -->
+              <!-- TODO: Remove this -->
+              <tr><td>Ashton fragged Dwight with a frag in the frag room</td></tr>
+              <tr><td>RedFishBlueF ran and hid in the corner to avoid the bomb</td></tr>
+              <tr><td>The Red Team has captured the flag</td></tr>
+              <tr><td>Mitochondria is the powerhouse of the cell.</td></tr>
+              <tr><td>Elmo is Godlike!</td></tr>
+              <tr><td>Elmo tagged RedFishBlueF</td></tr>
+              <tr><td>Elmo is on a 78 kill streak!</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <table class="table">
+          <thead>
+            <tr><th>Top Tag Streaks</th></tr>
+          </thead>
+          <tbody id="tagStreaks">
+            <!-- Fill dynamically w/ datasource -->
+            <!-- TODO: Remove this -->
+            <tr><td>945 - Elmo</td></tr>
+            <tr><td>5 - Ashton Summers</td></tr>
+            <tr><td>1 - RedFishBlueF</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
